@@ -6,7 +6,7 @@ import {
   objectType,
   stringArg,
 } from 'nexus';
-import { NexusGenObjects } from '../../nexus-typegen';
+import { PrismaClient } from '@prisma/client';
 
 export const Link = objectType({
   name: 'Link',
@@ -17,26 +17,13 @@ export const Link = objectType({
   },
 });
 
-let links: NexusGenObjects['Link'][] = [
-  {
-    id: 1,
-    url: 'www.howtographql.com',
-    description: 'Fullstack tutorial for GraphQl',
-  },
-  {
-    id: 2,
-    url: 'graphql.org',
-    description: 'GraphQl official website',
-  },
-];
-
 export const LinkQuery = extendType({
   type: 'Query',
   definition(t) {
     t.nonNull.list.nonNull.field('feed', {
       type: 'Link',
-      resolve(parent, args, context, info) {
-        return links;
+      resolve(parent, args, context) {
+        return context.prisma.link.findMany();
       },
     });
   },
@@ -53,13 +40,9 @@ export const linkMutation = extendType({
       },
       resolve(parent, args, context) {
         const { description, url } = args;
-        let latestId = links.length + 1;
-        const newlink = {
-          id: latestId,
-          description: description,
-          url: url,
-        };
-        links.push(newlink);
+        const newlink = context.prisma.link.create({
+          data: { description, url },
+        });
         return newlink;
       },
     });
@@ -73,10 +56,13 @@ export const linkMutation = extendType({
       },
       resolve(parent, args, context) {
         const { id, description, url } = args;
-        const link = links.find((link) => link.id === id);
-        if (!link) throw new Error('The link with given id does not exist');
-        if (url) link.url = url;
-        if (description) link.description = description;
+        const link = context.prisma.link.update({
+          where: { id },
+          data: {
+            description: description || undefined,
+            url: url || undefined,
+          },
+        });
         return link;
       },
     });
@@ -88,9 +74,7 @@ export const linkMutation = extendType({
       },
       resolve(parent, args, context) {
         const { id } = args;
-        const link = links.find((link) => link.id === id);
-        if (!link) return false;
-        links = links.filter((link) => link.id !== id);
+        context.prisma.link.findUnique({ where: { id } });
         return true;
       },
     });
